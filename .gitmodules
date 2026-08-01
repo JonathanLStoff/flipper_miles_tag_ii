@@ -1,0 +1,3 @@
+[submodule "milesTag"]
+	path = milesTagArduino
+	url = https://github.com/ncmreynolds/milesTag.git

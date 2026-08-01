@@ -1,0 +1,10 @@
+.ufbt/
+dist/
+build/
+__pycache__/
+*.pyc
+*.fap
+*.elf
+*.map
+.vscode/
+.idea/

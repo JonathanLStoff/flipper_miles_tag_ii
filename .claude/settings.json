@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(USERPROFILE=\"C:\\\\Users\\\\legoc\" TMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" TEMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" python -m ufbt build)",
+      "Bash(USERPROFILE=\"C:\\\\Users\\\\legoc\" TMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" TEMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" python3 -m ufbt build)",
+      "Bash(curl -sL -o vil.c \"https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/release/applications/services/gui/modules/variable_item_list.c\")",
+      "Bash(awk '/^void variable_item_list_process_ok|^static void variable_item_list_process_ok\\\\\\(VariableItemList\\\\* variable_item_list\\\\\\) \\\\{/,/^}/' vil.c)",
+      "Bash(curl -sL -o sm.c \"https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/release/applications/services/gui/scene_manager.c\")",
+      "Bash(awk '/^void scene_manager_next_scene/,/^}/' sm.c)",
+      "Bash(curl -sL -o view.c \"https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/release/applications/services/gui/view.c\")",
+      "Bash(awk '/^void\\\\* view_get_model/,/^}/' view.c)",
+      "Bash(curl -sL -o submenu.c \"https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/release/applications/services/gui/modules/submenu.c\")",
+      "Bash(awk '/static void submenu_process_ok/,/^}/' submenu.c)",
+      "Bash(awk '/^void submenu_process_ok|^static void submenu_process_ok\\\\\\(Submenu\\\\* submenu, InputType input_type\\\\\\) \\\\{/,/^}/' submenu.c)",
+      "Bash(python tests/test_protocol.py)",
+      "Bash(USERPROFILE=\"C:\\\\Users\\\\legoc\" TMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" TEMP=\"C:\\\\Users\\\\legoc\\\\AppData\\\\Local\\\\Temp\" python3 -m ufbt clean)",
+      "Bash(python -)"
+    ]
+  }
+}
