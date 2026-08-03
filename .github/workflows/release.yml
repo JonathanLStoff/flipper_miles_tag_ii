@@ -1,0 +1,68 @@
+name: Build and Release
+
+# Only runs on branches named rel-* (e.g. rel-1.2.0) - every push to one of
+# those builds the .fap and publishes/updates a GitHub Release named after
+# the branch, with the .fap attached. workflow_dispatch is there so a
+# rel-* branch can be re-released on demand without an empty commit.
+on:
+  push:
+    branches:
+      - "rel-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create/update releases
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never abandon a release mid-publish
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # mac-address-vendor-database/ is a git submodule (a reference to
+          # https://github.com/uxmansarwar/mac-address-vendor-database, not
+          # content copied into this repo) - without this the raw OUI CSVs
+          # tools/build_vendor_db.py needs just wouldn't be there.
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build toolchain (ufbt + Flipper SDK)
+        run: make setup
+
+      - name: Build the .fap
+        run: make build
+
+      - name: Locate build output
+        id: fap
+        run: |
+          FAP_PATH="$HOME/.ufbt/build/hot_cold.fap"
+          test -f "$FAP_PATH" || { echo "::error::$FAP_PATH not found after build"; exit 1; }
+          echo "path=$FAP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the GitHub Release for this branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          FAP="${{ steps.fap.outputs.path }}"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - replacing its .fap asset"
+            gh release upload "$TAG" "$FAP" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            echo "Creating new release $TAG"
+            gh release create "$TAG" "$FAP" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --generate-notes
+          fi
