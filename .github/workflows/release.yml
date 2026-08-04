@@ -4,6 +4,10 @@ name: Build and Release
 # those builds the .fap and publishes/updates a GitHub Release named after
 # the branch, with the .fap attached. workflow_dispatch is there so a
 # rel-* branch can be re-released on demand without an empty commit.
+#
+# Nothing here names the app. Everything comes from application.fam by way of
+# the Makefile's print-* targets, so this file can be copied to another Flipper
+# app as-is.
 on:
   push:
     branches:
@@ -24,10 +28,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          # mac-address-vendor-database/ is a git submodule (a reference to
-          # https://github.com/uxmansarwar/mac-address-vendor-database, not
-          # content copied into this repo) - without this the raw OUI CSVs
-          # tools/build_vendor_db.py needs just wouldn't be there.
+          # This repo pulls in the milesTag Arduino library as a submodule (a
+          # reference to https://github.com/ncmreynolds/milesTag rather than
+          # content copied in here). It is protocol reference material and is
+          # deliberately excluded from the build, but checking it out keeps the
+          # tree identical to a local clone. Harmless in a repo with no
+          # submodules, which is why it stays in the template.
           submodules: recursive
 
       - name: Set up Python
@@ -35,18 +41,64 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Identify the app
+        id: app
+        run: |
+          set -euo pipefail
+
+          # The Makefile reads these out of application.fam. Assigning first (and
+          # checking) rather than echoing the substitutions straight into
+          # GITHUB_OUTPUT: a failure inside $(...) would not fail the echo, and
+          # an empty appid would quietly produce a "-rel-x.y.z.fap" asset.
+          APP_ID="$(make -s print-appid)"
+          APP_NAME="$(make -s print-name)"
+          APP_VERSION="$(make -s print-version)"
+
+          if [ -z "$APP_ID" ]; then
+            echo "::error::could not read appid from application.fam"
+            exit 1
+          fi
+          echo "Building $APP_NAME ($APP_ID) version $APP_VERSION"
+
+          {
+            echo "id=$APP_ID"
+            echo "name=${APP_NAME:-$APP_ID}"
+            echo "version=$APP_VERSION"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Install build toolchain (ufbt + Flipper SDK)
         run: make setup
 
       - name: Build the .fap
         run: make build
 
-      - name: Locate build output
+      - name: Stage the build output
         id: fap
         run: |
-          FAP_PATH="$HOME/.ufbt/build/hot_cold.fap"
-          test -f "$FAP_PATH" || { echo "::error::$FAP_PATH not found after build"; exit 1; }
-          echo "path=$FAP_PATH" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          # ufbt builds into ~/.ufbt/build/<appid>.fap, a per-user cache shared
+          # by every ufbt app - not into the working directory.
+          BUILT="$(make -s print-fap)"
+          if [ ! -f "$BUILT" ]; then
+            echo "::error::$BUILT not found after build"
+            ls -la "$HOME/.ufbt/build" || true
+            exit 1
+          fi
+
+          # Give the release asset a self-describing name; the cache filename is
+          # just the appid and says nothing about which release it came from.
+          mkdir -p dist
+          ASSET="dist/${{ steps.app.outputs.id }}-${GITHUB_REF_NAME}.fap"
+          cp "$BUILT" "$ASSET"
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the .fap as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.app.outputs.id }}-${{ github.ref_name }}
+          path: ${{ steps.fap.outputs.asset }}
+          if-no-files-found: error
 
       - name: Create or update the GitHub Release for this branch
         env:
@@ -54,15 +106,16 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
-          FAP="${{ steps.fap.outputs.path }}"
+          ASSET="${{ steps.fap.outputs.asset }}"
+          TITLE="${{ steps.app.outputs.name }} ${TAG}"
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists - replacing its .fap asset"
-            gh release upload "$TAG" "$FAP" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
           else
             echo "Creating new release $TAG"
-            gh release create "$TAG" "$FAP" \
+            gh release create "$TAG" "$ASSET" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "$TAG" \
+              --title "$TITLE" \
               --generate-notes
           fi

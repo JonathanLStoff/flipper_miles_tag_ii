@@ -188,6 +188,22 @@ re-derives the packet formats from the specification and asserts that the tables
 and layouts compiled into [miles_tag_protocol.c](miles_tag_protocol.c) still agree
 with it. It needs no hardware.
 
+## Releasing
+
+Push a branch named `rel-*` (e.g. `rel-1.1.0`) and
+[.github/workflows/release.yml](.github/workflows/release.yml) builds the `.fap`
+and publishes a GitHub Release named after the branch, with
+`<appid>-<branch>.fap` attached. Pushing again to the same branch replaces the
+asset rather than creating a second release. `workflow_dispatch` re-releases a
+branch without needing an empty commit.
+
+`application.fam` is the single source of truth for the app's identity: the
+Makefile reads `appid`, `name` and `fap_version` out of it, and CI asks the
+Makefile via `make -s print-appid` / `print-name` / `print-version` / `print-fap`.
+Neither the Makefile nor the workflow spells the app's name anywhere, so both
+can be copied to another Flipper app unchanged — only `application.fam` needs
+editing.
+
 ## Layout
 
 | File | Contents |

@@ -9,8 +9,8 @@ App(
     fap_icon="images/miles_tag_ii_10px.png",
     fap_icon_assets="images",
     fap_description="Transmit any MilesTag II laser tag IR signal: shots (player/team/damage), health/ammo grants, admin commands and pickups, on a 38/40/56 kHz carrier.",
-    fap_author="nerfbilly64",
-    fap_version="1.0",
+    fap_author="Jonathan Stoff",
+    fap_version="1.1.0",
     # Listed one by one on purpose: the default "*.c*" glob is recursive and
     # would try to compile the Arduino reference library in milesTagArduino/.
     sources=[

@@ -9,7 +9,31 @@
 
 PYTHON      ?= python3
 SD          ?= D:
-APPID       := miles_tag_ii
+
+# application.fam is the single source of truth for the app's identity - ufbt
+# names the build output after `appid`. Reading it here (rather than repeating
+# the name) is what lets this Makefile and .github/workflows/release.yml be
+# copied to another app unchanged.
+APPID       := $(shell sed -n 's/^[[:space:]]*appid="\([^"]*\)".*/\1/p' application.fam | head -1)
+APPNAME     := $(shell sed -n 's/^[[:space:]]*name="\([^"]*\)".*/\1/p' application.fam | head -1)
+APPVERSION  := $(shell sed -n 's/^[[:space:]]*fap_version="\([^"]*\)".*/\1/p' application.fam | head -1)
+
+ifeq ($(strip $(APPID)),)
+$(error Could not read appid from application.fam)
+endif
+
+# Are we on Windows? Do NOT rely on OS=Windows_NT alone: the same MSYS2 profile
+# described below also strips OS from the environment make inherits, so under
+# Git-Bash `$(OS)` is empty and the Windows branch would be skipped - producing
+# exactly the broken "~" path this block exists to prevent. uname is the
+# reliable signal, and on real POSIX it correctly reports Linux/Darwin (which is
+# what CI needs).
+UNAME_S := $(shell uname -s 2>/dev/null)
+ifeq ($(OS),Windows_NT)
+WINDOWS := 1
+else ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(UNAME_S)))
+WINDOWS := 1
+endif
 
 # On Windows, MSYS2/Git-Bash `make` runs recipes through a bash whose own
 # profile scripts unconditionally re-export a fake POSIX HOME (e.g.
@@ -25,7 +49,7 @@ APPID       := miles_tag_ii
 # directly, ignoring whatever bash stripped) and inject it inline on every
 # recipe invocation via $(RUN) - inline assignment on the command itself
 # is what actually survives, unlike `export`.
-ifeq ($(OS),Windows_NT)
+ifeq ($(WINDOWS),1)
 WIN_USERPROFILE := $(shell powershell -NoProfile -Command "[Environment]::GetFolderPath('UserProfile')")
 RUN := USERPROFILE="$(WIN_USERPROFILE)" TMP="$(WIN_USERPROFILE)\AppData\Local\Temp" TEMP="$(WIN_USERPROFILE)\AppData\Local\Temp"
 FAP := $(WIN_USERPROFILE)/.ufbt/build/$(APPID).fap
@@ -34,10 +58,10 @@ RUN :=
 FAP := $(HOME)/.ufbt/build/$(APPID).fap
 endif
 
-.PHONY: help setup build install launch test clean
+.PHONY: help setup build install launch test clean print-appid print-name print-version print-fap
 
 help:
-	@echo "MilesTag II TX - make targets"
+	@echo "$(APPNAME) - make targets"
 	@echo ""
 	@echo "  make setup                Install Python deps (ufbt) and pull the Flipper SDK"
 	@echo "  make build                Build the .fap"
@@ -83,3 +107,19 @@ test:
 
 clean:
 	$(RUN) $(PYTHON) -m ufbt clean
+
+# ------------------------------------------------------------ tooling queries
+# Used by .github/workflows/release.yml so CI never has to know the app's name.
+# `make -s print-fap` prints the path ufbt built, nothing else.
+
+print-appid:
+	@echo "$(APPID)"
+
+print-name:
+	@echo "$(APPNAME)"
+
+print-version:
+	@echo "$(APPVERSION)"
+
+print-fap:
+	@echo "$(FAP)"
